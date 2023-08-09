@@ -3,6 +3,8 @@ var wan_route_x = '<% nvram_get_x("", "wan_route_x"); %>';
 var wan_proto = '<% nvram_get_x("", "wan_proto"); %>';
 var lan_proto = '<% nvram_get_x("", "lan_proto_x"); %>';
 var log_float = '<% nvram_get_x("", "log_float_ui"); %>';
+var www_L8x = '<% nvram_get_x("", "www_L8x"); %>';
+var www_L9x = '<% nvram_get_x("", "www_L9x"); %>';
 var log_stamp = 0;
 var sysinfo = <% json_system_status(); %>;
 var uptimeStr = "<% uptime(); %>";
@@ -15,7 +17,9 @@ var cookie_pref = 'n56u_cookie_';
 var uagent = navigator.userAgent.toLowerCase();
 var is_ie11p = (/trident\/7\./).test(uagent);
 var is_mobile = (/iphone|ipod|ipad|iemobile|android|blackberry|fennec/).test(uagent);
+var is_msie = (/msie/).test(uagent);
 
+var new_ss_internet = '<% nvram_get_x("", "ss_internet"); %>';
 var new_wan_internet = '<% nvram_get_x("", "link_internet"); %>';
 var id_check_status = 0;
 var id_system_info = 0;
@@ -47,12 +51,12 @@ function unload_body(){
 }
 
 function enableCheckChangedStatus(flag){
-	var tm_int_sec = 1;
+	var tm_int_sec = 3;
 
 	disableCheckChangedStatus();
 
 	if (new_wan_internet == '0')
-		tm_int_sec = 2;
+		tm_int_sec = 4;
 	else if (new_wan_internet == '1')
 		tm_int_sec = 5;
 
@@ -72,10 +76,26 @@ function update_internet_status(){
 		showMapWANStatus(0);
 }
 
+function update_ss_internet_status(){
+	if (new_ss_internet == '1')
+		showMapSSStatus(1);
+	else if(new_ss_internet == '2')
+		showMapSSStatus(2);
+	else
+		showMapSSStatus(0);
+}
+
 function notify_status_internet(wan_internet){
 	this.new_wan_internet = wan_internet;
 	if((location.pathname == "/" || location.pathname == "/index.asp") && (typeof(update_internet_status) === 'function'))
 		update_internet_status();
+
+}
+
+function notify_status_ss_internet(ss_internet){
+	this.new_ss_internet = ss_internet;
+	if((location.pathname == "/" || location.pathname == "/index.asp") && (typeof(update_ss_internet_status) === 'function'))
+		update_ss_internet_status();
 }
 
 function notify_status_vpn_client(vpnc_state){
@@ -95,6 +115,7 @@ function get_changed_status(){
 		},
 		success: function(response) {
 			notify_status_internet(now_wan_internet);
+			notify_status_ss_internet(now_ss_internet);
 			notify_status_vpn_client(now_vpnc_state);
 			enableCheckChangedStatus();
 		}
@@ -110,10 +131,10 @@ function get_system_info(){
 		dataType: 'script',
 		cache: true,
 		error: function(xhr) {
-			id_system_info = setTimeout('get_system_info()', 2000);
+			id_system_info = setTimeout('get_system_info()', 3000);
 		},
 		success: function(response) {
-			id_system_info = setTimeout('get_system_info()', 2000);
+			id_system_info = setTimeout('get_system_info()', 3000);
 			setSystemInfo(response);
 		}
 	});
@@ -202,6 +223,19 @@ function showSystemInfo(cpu_now,force){
 		$j('#wifi5_b').addClass('btn-info');
 	else
 		$j('#wifi5_b').removeClass('btn-info');
+		
+	if(parseInt(sysinfo.wifi2.button) > 0)
+		$j('#button_script1').addClass('btn-info');
+	else
+		$j('#button_script1').removeClass('btn-info');
+		
+	if(parseInt(sysinfo.wifi5.button) > 0)
+		$j('#button_script2').addClass('btn-info');
+	else
+		$j('#button_script2').removeClass('btn-info');
+
+	$j('#button_script1').val(sysinfo.wifi2.info);
+	$j('#button_script2').val(sysinfo.wifi5.info);
 
 	if(parseInt(sysinfo.wifi2.guest) > 0)
 		$j('#wifi2_b_g').addClass('btn-info');
@@ -219,12 +253,23 @@ function showSystemInfo(cpu_now,force){
 		getSystemJsonData(cpu_now, sysinfo.ram);
 }
 
-var menu_code="", navL1="", navL2="", tab_code="", footer_code;
+var menu_code="", menu1_code="", menu2_code="", tab_code="", footer_code;
 var enabled2Gclass = '<% nvram_match_x("","rt_radio_x", "1", "btn-info"); %>';
 var enabled5Gclass = '<% nvram_match_x("","wl_radio_x", "1", "btn-info"); %>';
 var enabledGuest2Gclass = '<% nvram_match_x("","rt_guest_enable", "1", "btn-info"); %>';
 var enabledGuest5Gclass = '<% nvram_match_x("","wl_guest_enable", "1", "btn-info"); %>';
 var enabledBtnCommit = '<% nvram_match_x("","nvram_manual", "0", "display:none;"); %>';
+var enabledBtnshellinabox = '<% nvram_match_x("","shellinabox_enable", "0", "display:none;"); %>';
+
+var button_script_1 = '';
+var button_script_2 = '';
+var button_script_1_s = '<% nvram_get_x("", "button_script_1_s"); %>';
+var button_script_2_s = '<% nvram_get_x("", "button_script_2_s"); %>';
+
+if ('<% nvram_get_x("", "button_script_1_s"); %>' == '')
+	var button_script_1_s = 'KP';
+if ('<% nvram_get_x("", "button_script_2_s"); %>' == '')
+	var button_script_2_s = 'SS';
 
 // L3 = The third Level of Menu
 function show_banner(L3){
@@ -246,12 +291,13 @@ function show_banner(L3){
 		bc += '<button id="syslog_panel_button" class="handle" href="/"><span class="log_text">Log</span></button>\n';
 		bc += '<table class="" style="margin-top: 0px; margin-bottom: 5px" width="100%" border="0">\n';
 		bc += '  <tr>\n';
-		bc += '    <td width="60%" style="text-align: left"><b><#General_x_SystemTime_itemname#>:</b><span class="alert alert-info" style="margin-left: 10px; padding-top: 4px; padding-bottom: 4px;" id="system_time_log_area"></span></td>\n';
-		bc += '    <td style="text-align: lift"><input type="hidden" id="scrATop" value=""></td>\n';
+		bc += '    <td width="50%" style="text-align: left"><b><#General_x_SystemTime_itemname#>:</b><span class="alert alert-info" style="margin-left: 10px; padding-top: 4px; padding-bottom: 4px;" id="system_time_log_area"></span></td>\n';
+		bc += '    <td style="text-align: left"><button type="button" id="shutdown_btn" class="btn btn-danger" style="min-width: 50px;" onclick="shutdown();"> <i class="icon icon-ban-circle"></i> 关机</button></td>\n';
+		bc += '    <td style="text-align: left"><input type="hidden" id="scrATop" value=""></td>\n';
 		bc += '    <td style="text-align: right"><button type="button" id="clearlog_btn" class="btn btn-info" style="min-width: 170px;" onclick="clearlog();"><#CTL_clear#></button></td>\n';
 		bc += '  </tr>\n';
 		bc += '</table>\n';
-		bc += '<span><textarea rows="28" wrap="off" class="span12" readonly="readonly" id="log_area"></textarea></span>\n';
+		bc += '<span><textarea rows="28" wrap="off" class="span12" disabled="disabled" id="log_area"></textarea></span>\n';
 		bc += '</div>\n';
 	}
 
@@ -347,11 +393,11 @@ function show_banner(L3){
 	bc += '<table class="table table-condensed" style="margin-bottom: 0px">\n';
 	bc += '  <tr>\n';
 	bc += '    <td width="50%" style="border: 0 none;"><#menu5_1#>:</td>\n';
-	bc += '    <td style="border: 0 none; min-width: 115px;"><div class="form-inline"><input type="button" id="wifi2_b" class="btn btn-mini '+enabled2Gclass+'" style="'+style_2g+'" value='+title_2g+' onclick="go_setting(2);">&nbsp;<input type="button" id="wifi5_b" style="'+style_5g+'" class="btn btn-mini '+enabled5Gclass+'" value="5G" onclick="go_setting(5);"></div></td>\n';
+	bc += '    <td style="border: 0 none; min-width: 180px;"><div class="form-inline"><input type="button" id="wifi2_b" class="btn btn-mini '+enabled2Gclass+'" style="'+style_2g+'" value='+title_2g+' onclick="go_setting(2);">&nbsp;<input type="button" id="wifi5_b" style="'+style_5g+'" class="btn btn-mini '+enabled5Gclass+'" value="5GHz" onclick="go_setting(5);">&nbsp;<input type="button" id="button_script1" style="width:55px;" class="btn btn-mini '+button_script_1+'" value="'+button_script_1_s+'" onclick="button_script1();"></div></td>\n';
 	bc += '  </tr>\n';
 	bc += '  <tr>\n';
 	bc += '    <td><#menu5_1_2#>:</td>\n';
-	bc += '    <td><div class="form-inline"><input type="button" id="wifi2_b_g" class="btn btn-mini '+enabledGuest2Gclass+'" style="'+style_2g+'" value='+title_2g+' onclick="go_wguest(2);">&nbsp;<input type="button" id="wifi5_b_g" style="'+style_5g+'" class="btn btn-mini '+enabledGuest5Gclass+'" value="5G" onclick="go_wguest(5);"></div></td>\n';
+	bc += '    <td><div class="form-inline"><input type="button" id="wifi2_b_g" class="btn btn-mini '+enabledGuest2Gclass+'" style="'+style_2g+'" value='+title_2g+' onclick="go_wguest(2);">&nbsp;<input type="button" id="wifi5_b_g" style="'+style_5g+'" class="btn btn-mini '+enabledGuest5Gclass+'" value="5GHz" onclick="go_wguest(5);">&nbsp;<input type="button" id="button_script2" style="width:55px;" class="btn btn-mini '+button_script_2+'" value="'+button_script_2_s+'" onclick="button_script2();"></div></td>\n';
 	bc += '  </tr>\n';
 	bc += '  <tr>\n';
 	bc += '    <td><#General_x_FirmwareVersion_itemname#></td>\n';
@@ -359,7 +405,7 @@ function show_banner(L3){
 	bc += '  </tr>\n';
 	bc += '  <tr>\n';
 	bc += '    <td><button type="button" id="commit_btn" class="btn btn-mini" style="width: 114px; height: 21px; outline:0; '+enabledBtnCommit+'" onclick="commit();"><i class="icon icon-fire"></i>&nbsp;<#CTL_Commit#></button></td>\n';
-	bc += '    <td><button type="button" id="logout_btn" class="btn btn-mini" style="height: 21px; outline:0;" title="<#t1Logout#>" onclick="logout();"><i class="icon icon-user"></i></button> <button type="button" id="reboto_btn" class="btn btn-mini" style="height: 21px; outline:0;" title="<#BTN_REBOOT#>" onclick="reboot();"><i class="icon icon-repeat"></i></button> <button type="button" id="shutdown_btn" class="btn btn-mini" style="height: 21px; outline:0;" title="<#BTN_SHUTDOWN#>" onclick="shutdown();"><i class="icon icon-off"></i></button></td>\n';
+	bc += '    <td><button type="button" id="shellinabox_btn" class="btn btn-mini btn-success" style="width: 100px; height: 21px; outline:0; '+enabledBtnshellinabox+'" onclick="button_shellinabox();">Web shell</button>&nbsp;<button type="button" id="logout_btn" class="btn btn-mini" style="height: 21px; outline:0;" title="<#BTN_LOGOUT#>" onclick="logout();"><i class="icon icon-refresh"></i></button>&nbsp;<button type="button" id="reboto_btn" class="btn btn-mini" style="height: 21px; outline:0;" title="<#BTN_REBOOT#>" onclick="reboot();"><i class="icon icon-off"></i></td>\n';
 	bc += '  </tr>\n';
 	bc += '</table>\n';
 	bc += '</div>\n';
@@ -377,287 +423,233 @@ function show_banner(L3){
 	show_top_status();
 }
 
-//new MENUS 2021-1-2 14:55
-var tabM0=[
-	{"title":"<#menu5_1_1#>","link":"Advanced_Wireless2g_Content.asp"},
-	{"title":"<#menu5_1_2#>","link":"Advanced_WGuest2g_Content.asp"},
-	{"title":"<#menu5_1_3#>","link":"Advanced_WMode2g_Content.asp"},
-	{"title":"<#menu5_1_4#>","link":"Advanced_ACL2g_Content.asp"},
-	{"title":"<#menu5_1_5#>","link":"Advanced_WSecurity2g_Content.asp"},
-	{"title":"<#menu5_1_6#>","link":"Advanced_WAdvanced2g_Content.asp"}
-];
-var tabM1=[
-	{"title":"<#menu5_1_1#>","link":"Advanced_Wireless_Content.asp"},
-	{"title":"<#menu5_1_2#>","link":"Advanced_WGuest_Content.asp"},
-	{"title":"<#menu5_1_3#>","link":"Advanced_WMode_Content.asp"},
-	{"title":"<#menu5_1_4#>","link":"Advanced_ACL_Content.asp"},
-	{"title":"<#menu5_1_5#>","link":"Advanced_WSecurity_Content.asp"},
-	{"title":"<#menu5_1_6#>","link":"Advanced_WAdvanced_Content.asp"}
-];
+var tabtitle = new Array(15);
+tabtitle[0] = new Array("", "<#menu5_1_1#>", "<#menu5_1_2#>", "<#menu5_1_3#>", "<#menu5_1_4#>", "<#menu5_1_5#>", "<#menu5_1_6#>");
+tabtitle[1] = new Array("", "<#menu5_1_1#>", "<#menu5_1_2#>", "<#menu5_1_3#>", "<#menu5_1_4#>", "<#menu5_1_5#>", "<#menu5_1_6#>");
+tabtitle[2] = new Array("", "<#menu5_2_1#>", "<#menu5_2_2#>", "<#menu5_2_3#>", "<#menu5_2_4#>", "<#menu5_2_5#>", "<#menu5_2_6#>");
+tabtitle[3] = new Array("", "<#menu5_3_1#>", "<#menu5_3_3#>", "<#menu5_3_4#>", "<#menu5_3_5#>", "<#menu5_3_6#>");
+tabtitle[4] = new Array("", "<#menu5_5_1#>", "<#menu5_5_5#>", "<#menu5_5_2#>", "<#menu5_5_3#>", "<#menu5_5_4#>");
+tabtitle[5] = new Array("", "<#menu5_4_3#>", "<#menu5_4_1#>", "<#menu5_4_2#>", "<#menu5_4_4#>", "<#menu5_4_5#>");
+tabtitle[6] = new Array("", "<#menu5_6_2#>", "<#menu5_6_5#>", "<#menu5_6_1#>", "<#menu5_6_3#>", "<#menu5_6_4#>", "<#menu5_6_6#>");
+tabtitle[7] = new Array("", "<#menu5_10_1#>", "<#menu5_10_2#>", "<#menu5_10_3#>");
+tabtitle[8] = new Array("", "<#menu5_11#>", "<#menu5_12#>", "WAN", "", "", "", "", "", "", "","流量监控");
+tabtitle[9] = new Array("", "<#menu5_7_2#>", "<#menu5_7_3#>", "<#menu5_7_5#>", "<#menu5_7_6#>", "<#menu5_7_8#>");
+tabtitle[10] = new Array("", "<% nvram_get_x("", "menu1_title1"); %>", "<% nvram_get_x("", "menu2_title1"); %>", "<% nvram_get_x("", "menu3_title1"); %>", "<% nvram_get_x("", "menu4_title1"); %>", "<% nvram_get_x("", "menu5_title1"); %>", "<% nvram_get_x("", "menu6_title1"); %>", "<% nvram_get_x("", "menu7_title1"); %>", "<% nvram_get_x("", "menu8_title1"); %>", "<% nvram_get_x("", "menu9_title1"); %>", "<% nvram_get_x("", "menu10_title1"); %>", "<% nvram_get_x("", "menu11_title1"); %>", "<% nvram_get_x("", "menu12_title1"); %>");
+tabtitle[11] = new Array("", "<% nvram_get_x("", "menu1_title2"); %>", "<% nvram_get_x("", "menu2_title2"); %>", "<% nvram_get_x("", "menu3_title2"); %>", "<% nvram_get_x("", "menu4_title2"); %>", "<% nvram_get_x("", "menu5_title2"); %>", "<% nvram_get_x("", "menu6_title2"); %>", "<% nvram_get_x("", "menu7_title2"); %>", "<% nvram_get_x("", "menu8_title2"); %>", "<% nvram_get_x("", "menu9_title2"); %>", "<% nvram_get_x("", "menu10_title2"); %>", "<% nvram_get_x("", "menu11_title2"); %>", "<% nvram_get_x("", "menu12_title2"); %>");
+tabtitle[12] = new Array("", "<% nvram_get_x("", "menu1_title3"); %>", "<% nvram_get_x("", "menu2_title3"); %>", "<% nvram_get_x("", "menu3_title3"); %>", "<% nvram_get_x("", "menu4_title3"); %>", "<% nvram_get_x("", "menu5_title3"); %>", "<% nvram_get_x("", "menu6_title3"); %>", "<% nvram_get_x("", "menu7_title3"); %>", "<% nvram_get_x("", "menu8_title3"); %>", "<% nvram_get_x("", "menu9_title3"); %>", "<% nvram_get_x("", "menu10_title3"); %>", "<% nvram_get_x("", "menu11_title3"); %>", "<% nvram_get_x("", "menu12_title3"); %>");
+tabtitle[13] = new Array("", "<% nvram_get_x("", "menu1_title4"); %>", "<% nvram_get_x("", "menu2_title4"); %>", "<% nvram_get_x("", "menu3_title4"); %>", "<% nvram_get_x("", "menu4_title4"); %>", "<% nvram_get_x("", "menu5_title4"); %>", "<% nvram_get_x("", "menu6_title4"); %>", "<% nvram_get_x("", "menu7_title4"); %>", "<% nvram_get_x("", "menu8_title4"); %>", "<% nvram_get_x("", "menu9_title4"); %>", "<% nvram_get_x("", "menu10_title4"); %>", "<% nvram_get_x("", "menu11_title4"); %>", "<% nvram_get_x("", "menu12_title4"); %>");
+tabtitle[14] = new Array("", "<% nvram_get_x("", "menu1_title5"); %>", "<% nvram_get_x("", "menu2_title5"); %>", "<% nvram_get_x("", "menu3_title5"); %>", "<% nvram_get_x("", "menu4_title5"); %>", "<% nvram_get_x("", "menu5_title5"); %>", "<% nvram_get_x("", "menu6_title5"); %>", "<% nvram_get_x("", "menu7_title5"); %>", "<% nvram_get_x("", "menu8_title5"); %>", "<% nvram_get_x("", "menu9_title5"); %>", "<% nvram_get_x("", "menu10_title5"); %>", "<% nvram_get_x("", "menu11_title5"); %>", "<% nvram_get_x("", "menu12_title5"); %>");
 
-var tabM2=[
-	{"title":"<#menu5_2_1#>","link":"Advanced_LAN_Content.asp"},
-	{"title":"<#menu5_2_2#>","link":"Advanced_DHCP_Content.asp"},
-	{"title":"<#menu5_2_3#>","link":"Advanced_GWStaticRoute_Content.asp"},
-	{"title":"<#menu5_2_4#>","link":"Advanced_IPTV_Content.asp"},
-	{"title":"<#menu5_2_5#>","link":"Advanced_Switch_Content.asp"},
-	{"title":"<#menu5_2_6#>","link":"Advanced_WOL_Content.asp"}
-];
-var tabM3=[
-	{"title":"<#menu5_3_1#>","link":"Advanced_WAN_Content.asp"},
-	{"title":"<#menu5_3_3#>","link":"Advanced_IPv6_Content.asp"},
-	{"title":"<#menu5_3_4#>","link":"Advanced_VirtualServer_Content.asp"},
-	{"title":"<#menu5_3_5#>","link":"Advanced_Exposed_Content.asp"},
-	{"title":"<#menu5_3_6#>","link":"Advanced_DDNS_Content.asp"}
-];
-var tabM4=[
-	{"title":"<#menu5_5_1#>","link":"Advanced_BasicFirewall_Content.asp"},
-	{"title":"<#menu5_5_5#>","link":"Advanced_Netfilter_Content.asp"},
-	{"title":"<#menu5_5_2#>","link":"Advanced_URLFilter_Content.asp"},
-	{"title":"<#menu5_5_3#>","link":"Advanced_MACFilter_Content.asp"},
-	{"title":"<#menu5_5_4#>","link":"Advanced_Firewall_Content.asp"}
-];
-var tabM5=[
-	{"title":"<#menu5_4_3#>","link":"Advanced_AiDisk_others.asp"},
-	{"title":"<#menu5_4_1#>","link":"Advanced_AiDisk_samba.asp"},
-	{"title":"<#menu5_4_2#>","link":"Advanced_AiDisk_ftp.asp"},
-	{"title":"<#menu5_4_4#>","link":"Advanced_Modem_others.asp"},
-	{"title":"<#menu5_4_5#>","link":"Advanced_Printer_others.asp"}
-];
-var tabM6=[
-	{"title":"<#menu5_6_2#>","link":"Advanced_System_Content.asp"},
-	{"title":"<#menu5_6_5#>","link":"Advanced_Services_Content.asp"},
-	{"title":"<#menu5_6_1#>","link":"Advanced_OperationMode_Content.asp"},
-	{"title":"<#menu5_6_3#>","link":"Advanced_FirmwareUpgrade_Content.asp"},
-	{"title":"<#menu5_6_4#>","link":"Advanced_SettingBackup_Content.asp"},
-	{"title":"<#menu5_6_6#>","link":"Advanced_Console_Content.asp"}
-];
-var tabM7=[
-	{"title":"<#menu5_10_1#>","link":"Advanced_Tweaks_Content.asp"},
-	{"title":"<#menu5_10_2#>","link":"Advanced_Scripts_Content.asp"},
-	{"title":"<#menu5_10_3#>","link":"Advanced_InetDetect_Content.asp"}
-];
-var tabM8=[
-	{"title":"<#menu5_11#>","link":"Main_WStatus2g_Content.asp"},
-	{"title":"<#menu5_12#>","link":"Main_WStatus_Content.asp"},
-	{"title":"WAN","link":"Main_EStatus_Content.asp#0"},
-	{"title":"","link":""},
-	{"title":"","link":""},
-	{"title":"","link":""},
-	{"title":"","link":""},
-	{"title":"","link":""},
-	{"title":"","link":""},
-	{"title":"","link":""}
-];
-var tabM9=[
-	{"title":"<#menu5_7_2#>","link":"Main_LogStatus_Content.asp"},
-	{"title":"<#menu5_7_3#>","link":"Main_DHCPStatus_Content.asp"},
-	{"title":"<#menu5_7_5#>","link":"Main_IPTStatus_Content.asp"},
-	{"title":"<#menu5_7_6#>","link":"Main_RouteStatus_Content.asp"},
-	{"title":"<#menu5_7_8#>","link":"Main_CTStatus_Content.asp"},
-];
-var tabM=[tabM0,tabM1,tabM2,tabM3,tabM4,tabM5,tabM6,tabM7,tabM8,tabM9];
+//Level 3 Tab title
+var tablink = new Array(15);
+tablink[0] = new Array("", "Advanced_Wireless2g_Content.asp", "Advanced_WGuest2g_Content.asp", "Advanced_WMode2g_Content.asp", "Advanced_ACL2g_Content.asp", "Advanced_WSecurity2g_Content.asp", "Advanced_WAdvanced2g_Content.asp");
+tablink[1] = new Array("", "Advanced_Wireless_Content.asp", "Advanced_WGuest_Content.asp", "Advanced_WMode_Content.asp", "Advanced_ACL_Content.asp", "Advanced_WSecurity_Content.asp", "Advanced_WAdvanced_Content.asp");
+tablink[2] = new Array("", "Advanced_LAN_Content.asp", "Advanced_DHCP_Content.asp", "Advanced_GWStaticRoute_Content.asp", "Advanced_IPTV_Content.asp", "Advanced_Switch_Content.asp", "Advanced_WOL_Content.asp");
+tablink[3] = new Array("", "Advanced_WAN_Content.asp", "Advanced_IPv6_Content.asp", "Advanced_VirtualServer_Content.asp", "Advanced_Exposed_Content.asp", "Advanced_DDNS_Content.asp");
+tablink[4] = new Array("", "Advanced_BasicFirewall_Content.asp", "Advanced_Netfilter_Content.asp", "Advanced_URLFilter_Content.asp", "Advanced_MACFilter_Content.asp", "Advanced_Firewall_Content.asp");
+tablink[5] = new Array("", "Advanced_AiDisk_others.asp", "Advanced_AiDisk_samba.asp", "Advanced_AiDisk_ftp.asp", "Advanced_Modem_others.asp", "Advanced_Printer_others.asp");
+tablink[6] = new Array("", "Advanced_System_Content.asp", "Advanced_Services_Content.asp", "Advanced_OperationMode_Content.asp", "Advanced_FirmwareUpgrade_Content.asp", "Advanced_SettingBackup_Content.asp", "Advanced_Console_Content.asp");
+tablink[7] = new Array("", "Advanced_Tweaks_Content.asp", "Advanced_Scripts_Content.asp", "Advanced_InetDetect_Content.asp");
+tablink[8] = new Array("", "Main_WStatus2g_Content.asp", "Main_WStatus_Content.asp", "", "", "", "", "", "", "", "","Main_BWMon.asp");
+tablink[9] = new Array("", "Main_LogStatus_Content.asp", "Main_DHCPStatus_Content.asp", "Main_IPTStatus_Content.asp", "Main_RouteStatus_Content.asp", "Main_CTStatus_Content.asp");
+tablink[10] = new Array("", "<% nvram_get_x("", "tablink11"); %>", "<% nvram_get_x("", "tablink21"); %>", "<% nvram_get_x("", "tablink31"); %>", "<% nvram_get_x("", "tablink41"); %>", "<% nvram_get_x("", "tablink51"); %>", "<% nvram_get_x("", "tablink61"); %>", "<% nvram_get_x("", "tablink71"); %>", "<% nvram_get_x("", "tablink81"); %>", "<% nvram_get_x("", "tablink91"); %>", "<% nvram_get_x("", "tablink101"); %>", "<% nvram_get_x("", "tablink111"); %>", "<% nvram_get_x("", "tablink121"); %>");
+tablink[11] = new Array("", "<% nvram_get_x("", "tablink12"); %>", "<% nvram_get_x("", "tablink22"); %>", "<% nvram_get_x("", "tablink32"); %>", "<% nvram_get_x("", "tablink42"); %>", "<% nvram_get_x("", "tablink52"); %>", "<% nvram_get_x("", "tablink62"); %>", "<% nvram_get_x("", "tablink72"); %>", "<% nvram_get_x("", "tablink82"); %>", "<% nvram_get_x("", "tablink92"); %>", "<% nvram_get_x("", "tablink102"); %>", "<% nvram_get_x("", "tablink112"); %>", "<% nvram_get_x("", "tablink122"); %>");
+tablink[12] = new Array("", "<% nvram_get_x("", "tablink13"); %>", "<% nvram_get_x("", "tablink23"); %>", "<% nvram_get_x("", "tablink33"); %>", "<% nvram_get_x("", "tablink43"); %>", "<% nvram_get_x("", "tablink53"); %>", "<% nvram_get_x("", "tablink63"); %>", "<% nvram_get_x("", "tablink73"); %>", "<% nvram_get_x("", "tablink83"); %>", "<% nvram_get_x("", "tablink93"); %>", "<% nvram_get_x("", "tablink103"); %>", "<% nvram_get_x("", "tablink113"); %>", "<% nvram_get_x("", "tablink123"); %>");
+tablink[13] = new Array("", "<% nvram_get_x("", "tablink14"); %>", "<% nvram_get_x("", "tablink24"); %>", "<% nvram_get_x("", "tablink34"); %>", "<% nvram_get_x("", "tablink44"); %>", "<% nvram_get_x("", "tablink54"); %>", "<% nvram_get_x("", "tablink64"); %>", "<% nvram_get_x("", "tablink74"); %>", "<% nvram_get_x("", "tablink84"); %>", "<% nvram_get_x("", "tablink94"); %>", "<% nvram_get_x("", "tablink104"); %>", "<% nvram_get_x("", "tablink114"); %>", "<% nvram_get_x("", "tablink124"); %>");
+tablink[14] = new Array("", "<% nvram_get_x("", "tablink15"); %>", "<% nvram_get_x("", "tablink25"); %>", "<% nvram_get_x("", "tablink35"); %>", "<% nvram_get_x("", "tablink45"); %>", "<% nvram_get_x("", "tablink55"); %>", "<% nvram_get_x("", "tablink65"); %>", "<% nvram_get_x("", "tablink75"); %>", "<% nvram_get_x("", "tablink85"); %>", "<% nvram_get_x("", "tablink95"); %>", "<% nvram_get_x("", "tablink105"); %>", "<% nvram_get_x("", "tablink115"); %>", "<% nvram_get_x("", "tablink125"); %>");
+//Level 2 Menu
+menuL2_title = new Array("", "<#menu5_11#>", "<#menu5_12#>", "<#menu5_2#>", "<#menu5_3#>", "<#menu5_5#>", "<#menu5_4#>", "<#menu5_6#>", "<#menu5_10#>", "<#menu5_9#>", "<#menu5_7#>", "<% nvram_get_x("", "menu0_title1"); %>", "<% nvram_get_x("", "menu0_title2"); %>", "<% nvram_get_x("", "menu0_title3"); %>","<% nvram_get_x("", "menu0_title4"); %>","<% nvram_get_x("", "menu0_title5"); %>");
+menuL2_link  = new Array("", tablink[0][1], tablink[1][1], tablink[2][1], tablink[3][1], tablink[4][1], tablink[5][1], tablink[6][1], tablink[7][1], support_2g_radio() ? tablink[8][1] : "Main_EStatus_Content.asp", tablink[9][1], tablink[10][1], tablink[11][1], tablink[12][1],tablink[13][1],tablink[14][1]);
 
 //Level 1 Menu in Gateway, Router mode
-//生成子菜单 /L1 sub 与 L2 sub对应
-var menuL1=[
-	{"title":"<#menu1#>","link":"index.asp","icon":"icon-home","sub":"main"},
-	//{"title":"Aria","link":"./ariaweb/index.html","icon":"icon-hdd"},
-	//{"title":"","link":"","icon":"icon-retweet"},
-	//{"title":"","link":"","icon":"icon-globe"},
-	{"title":"<#menu5_8#>","link":"Advanced_System_Info.asp","icon":"icon-random","sub":"log"},
-	{"title":"<#menu5#>","link":"as.asp","icon":"icon-wrench","sub":"adv"},
-	{"title":"插件","link":"javascript:;","icon":"icon-tasks","sub":"plugin"}
-];
-//Level 2 Menu
-var menuL2=[
-	{"title":"<#menu5_11#>","link":tabM[0][0].link,"sub":"main"},
-	{"title":"<#menu5_12#>","link":tabM[1][0].link,"sub":"main"},
-	{"title":"<#menu5_2#>","link":tabM[2][0].link,"sub":"main"},
-	{"title":"<#menu5_3#>","link":tabM[3][0].link,"sub":"main"},
-	{"title":"<#menu5_5#>","link":tabM[4][0].link,"sub":"adv"},
-	{"title":"<#menu5_4#>","link":tabM[5][0].link,"sub":"adv"},
-	{"title":"<#menu5_6#>","link":tabM[6][0].link,"sub":"adv"},
-	{"title":"<#menu5_10#>","link":tabM[7][0].link,"sub":"adv"},
-	{"title":"<#menu5_9#>","link":support_2g_radio() ? tabM[8][0].link : "Main_EStatus_Content.asp","sub":"log"},
-	{"title":"<#menu5_7#>","link":tabM[9][0].link,"sub":"log"},
-	{"title":"<#menu4#>","link":"Main_TrafficMonitor_realtime.asp","sub":"log"}
-];
-
-/* plugin menu 插件菜单 */
-if (found_app_aria()){
-	var mx={"title":"Aria","link":"./ariaweb/index.html","sub":"plugin"};//json格式
-	menuL2.push(mx);
-}
-if (found_app_torr()){
-	var linkt="javascript:window.open('//"+location.hostname+":<% nvram_get_x("", "trmd_rport"); %>/transmission/web/');void(0);";
-	var mx={"title":"Transmission","link":linkt,"sub":"plugin"};
-	menuL2.push(mx);
-}
-if (found_app_scutclient()){
-	var mx={"title":"<#menu5_13#>","link":"scutclient.asp","sub":"plugin"};
-	var mx2=[mx,{"title":"log","link":"scutclient_log.asp"}];//多个页面
-	menuL2.push(mx);
-	tabM.push(mx2);
-}
-if (found_app_dnsforwarder()){
-	var mx={"title":"<#menu5_15#>","link":"dns-forwarder.asp","sub":"plugin"};
-	var mx2=[mx];
-	menuL2.push(mx);
-	tabM.push(mx2);
-}
-if (found_app_shadowsocks()){
-	var mx={"title":"<#menu5_16#>","link":"Shadowsocks.asp","sub":"plugin"};
-	var mx2=[mx,{"title":"log","link":"Shadowsocks_log.asp"}];
-	menuL2.push(mx);
-	tabM.push(mx2);
-}
-if (found_app_mentohust()){
-	var mx={"title":"mentohust","link":"mentohust.asp","sub":"plugin"};
-	var mx2=[mx,{"title":"log","link":"mentohust_log.asp"}];
-	menuL2.push(mx);
-	tabM.push(mx2);
-}
-/* plugin menu 插件菜单 结束*/
-
-/* 旧代码兼容/as.asp menu compatibility start */
-var menuL2_title=Array();var menuL2_link=Array();
-for(var i=0;i<menuL2.length;i++){
-	menuL2_title[i]=menuL2[i].title;
-	menuL2_link[i]=menuL2[i].link;
-}
-var tabtitle=Array();var tablink=Array();
-for(var i=0;i<tabM.length;i++){
-	tabtitle[i]= Array();
-	tablink[i]=Array();
-	for(var j=0;j<tabM[i].length;j++){
-		tablink[i][j]=tabM[i][j].link;
-		tabtitle[i][j]=tabM[i][j].title;
-	}
-}
-/* menu compatibility end */
+menuL1_title = new Array("", "<#menu1#>", "<#menu3#>", "<#menu2#>", "<#menu6#>", "<#menu4#>", "<#menu5_8#>", "<#menu5#>", "扩展功能");
+menuL1_link = new Array("", "index.asp", "aidisk.asp", "vpnsrv.asp", "vpncli.asp", "Main_TrafficMonitor_realtime.asp", "Advanced_System_Info.asp", "as.asp", "as2.asp");
+menuL1_icon = new Array("", "icon-home", "icon-hdd", "icon-retweet", "icon-globe", "icon-tasks", "icon-random", "icon-wrench", "icon-th");
 
 function show_menu(L1, L2, L3){
-	var $j = jQuery.noConflict();
 	var i;
-	if(sw_mode == '3'){
-		tabM[2].splice(3,1);//LAN
-		tabM[3].splice(1,5);//WAN
-		tabM[4].splice(1,5);//firewall
-		tabM[5].splice(4,1);//USB
-		tabM[9].splice(2,4);//log
-		menuL2[4].link = "";  //remove WAN
-		menuL2[5].link = "";  //remove Firewall
-		if (lan_proto == '1'){
-			tabM[2].splice(2,1);
-		}
-		var url="Advanced_APLAN_Content.asp";
-		tabM[2][1].link = url;
-		menuL2[3].link = url;
-	}else{
-		if(sw_mode == '4'){
-			tabM[3].splice(3,2);
-		}
-		if(!support_ipv6()){
-			tabM[3].splice(2,1);
-		}
-	}
-	//LAN编号 网络信息页
 	var num_ephy = support_num_ephy();
 	if (num_ephy < 2)
 		num_ephy = 2;
 	if (num_ephy > 8)
 		num_ephy = 8;
-	for (i=1;i<num_ephy;i++){
-		tabM[8][i+3] = {"title":"LAN"+i,"link":"Main_EStatus_Content.asp#"+i};
+	if(sw_mode == '3'){
+		tabtitle[2].splice(3,1);//LAN
+		tablink[2].splice(3,1);
+		tabtitle[3].splice(1,5);//WAN
+		tablink[3].splice(1,5);
+		tabtitle[4].splice(1,5);//firewall
+		tablink[4].splice(1,5);
+		tabtitle[5].splice(4,1);//USB
+		tablink[5].splice(4,1);
+		tabtitle[9].splice(2,4);//log
+		tablink[9].splice(2,4);
+		tablink[2][1] = "Advanced_APLAN_Content.asp";
+		menuL2_link[3] = tablink[2][1];
+		menuL2_link[4] = "";  //remove WAN
+		menuL2_title[4] = "";
+		menuL2_link[5] = "";  //remove Firewall
+		menuL2_title[5] = "";
+		menuL1_link[2] = "";  //remove AiDisk;
+		menuL1_title[2] = "";
+		menuL1_link[3] = "";  //remove VPN svr
+		menuL1_title[3] = "";
+		menuL1_link[4] = "";  //remove VPN cli
+		menuL1_title[4] = "";
+		
+		if (lan_proto == '1'){
+			tabtitle[2].splice(2,1);
+			tablink[2].splice(2,1);
+		}
+	}else{
+		if(sw_mode == '4'){
+			tablink[3].splice(3,2);
+			tabtitle[3].splice(3,2);
+		}
+		if(!support_ipv6()){
+			tablink[3].splice(2,1);
+			tabtitle[3].splice(2,1);
+		}
 	}
+
+	for (i=0;i<num_ephy;i++){
+		tablink[8][i+3] = "Main_EStatus_Content.asp#"+i.toString();
+		if (i>0)
+			tabtitle[8][i+3] = "LAN"+i.toString();
+	}
+
 	if(num_ephy<8){
-		tabM[8].splice(3+num_ephy,8-num_ephy);
+		tabtitle[8].splice(3+num_ephy,8-num_ephy);
+		tablink[8].splice(3+num_ephy,8-num_ephy);
 	}
 
 	if(!support_2g_radio()){
-		menuL2.splice(1,1);  //remove 2G
-		tabM[0].splice(1,6);
-		tabM[8].splice(1,1);
+		menuL2_link[1] = "";  //remove 2G
+		menuL2_title[1] = "";
+		tabtitle[0].splice(1,6);
+		tablink[0].splice(1,6);
+		tabtitle[8].splice(1,1);
+		tablink[8].splice(1,1);
 	}
 
 	if(!support_5g_radio()){
-		menuL2.splice(2,1);;  //remove 5GHz
-		tabM[1].splice(1,6);
+		menuL2_link[2] = "";  //remove 5GHz
+		menuL2_title[2] = "";
+		tabtitle[1].splice(1,6);
+		tablink[1].splice(1,6);
 		var idx = support_2g_radio() ? 2 : 1;
-		tabM[8].splice(idx,1);
+		tabtitle[8].splice(idx,1);
+		tablink[8].splice(idx,1);
 	}
 
 	if(!support_storage()){
-		tabM[5].splice(1,5);
-		menuL2[6].link = "";  //remove USB
+		tabtitle[5].splice(1,5);
+		tablink[5].splice(1,5);
+		menuL1_link[2] = "";  //remove AiDisk
+		menuL1_title[2] = "";
+		menuL2_link[6] = "";  //remove USB
+		menuL2_title[6] = "";
 	}else{
 		if(!support_usb()){
-			tabM[5].splice(4,2);
+			tabtitle[5].splice(4,2);
+			tablink[5].splice(4,2);
 		}
 		if(!found_app_smbd() && !found_app_ftpd()){
-			tabM[5].splice(2,2);
+			tabtitle[5].splice(2,2);
+			tablink[5].splice(2,2);
+			menuL1_link[2] = "";
+			menuL1_title[2] = "";
 		}
 		else if(!found_app_smbd()){
-			tabM[5].splice(2,1);
+			tabtitle[5].splice(2,1);
+			tablink[5].splice(2,1);
 		}
 		else if(!found_app_ftpd()){
-			tabM[5].splice(3,1);
+			tabtitle[5].splice(3,1);
+			tablink[5].splice(3,1);
+			menuL1_link[2] = "";
+			menuL1_title[2] = "";
 		}
 	}
-	//showmenu(L1_id , L2_id , L3_id)
-	//L1
-	var navL1="";var navL2S="";//submenu
-	for(i = 0; i < menuL1.length; i++){
-		var navL2="";
-		var title1=menuL1[i].title;
-		var link1=menuL1[i].link;
-		var sub1=menuL1[i].sub || "";
-		
-		if(title1 == ""){continue;}
-		if(typeof sub1 !="undefined" && sub1 != ""){
-			//L2
-			for(var j = 0; j < menuL2.length; j++){
-				//console.log(menuL2[j].sub +"--" + sub1);
-				if (typeof menuL2[j].sub =='undefined' || menuL2[j].sub != sub1) {continue;}
-				var title2= menuL2[j].title;
-				var link2= menuL2[j].link;
-				if(title2 == ""){continue;}
-				else if(L2 == (j+1))
-					navL2 += '<a href="javascript: void(0)" style="color: #005580"><i class="icon-minus"></i><b>&nbsp;&nbsp;'+title2+'</b></a>';
+
+//var www_L8x =1 ;
+//var www_L9x =1 ;
+
+	for(i = 1; i <= menuL1_title.length-1; i++){
+		if(menuL1_title[i] == "")
+			continue;
+		else if(L1 == i && L2 <= 0){
+			if (L1 == 8 && www_L8x != 1){
+				menu1_code +='<ul><li><div id="subMenu1" class="accordion" style="width:212px;">';
+				for(var j = 1; j <= 10; ++j){
+				if(menuL2_title[j] == "")
+					continue;
+				else if(L2 == j)
+					menu1_code += '<a href="javascript: void(0)" style="color: #005580; font-weight: bold"><i class="icon-minus"></i>&nbsp;&nbsp;'+menuL2_title[j]+'</a>\n';
 				else
-					navL2 += '<a href="'+link2+'"><i class="icon-minus"></i>&nbsp;&nbsp;'+title2+'</a>';
-			}
-			$j('#subMenu').append(navL2);
-			navL2= '<div class="accordion">'+navL2+'</div>';
-		}
-		var icon=menuL1[i].icon !== ""?menuL1[i].icon:"";
-		if(L1 == (i+1) && L2 <= 0)
-			navL1 += '<li class="active" id="option'+i+'"><a href="javascript:;"><i class="'+icon+'"></i>&nbsp;&nbsp;'+title1+'</a>'+navL2+'</li>';
-		else
-			navL1 += '<li id="option'+i+'"><a href="'+link1+'"><i class="'+icon+'"></i>&nbsp;&nbsp;'+title1+'</a>'+navL2+'</li>';
+					menu1_code += '<a id="menuL2_link_'+j+'" href="'+menuL2_link[j]+'"><i class="icon-minus"></i>&nbsp;&nbsp;'+menuL2_title[j]+'</a>\n';
+				};
+				menu1_code += '</div></li></ul>';
+			};
+			menu1_code += '<li class="active" id="option'+i+'"><a href="javascript:;"><i class="'+menuL1_icon[i]+'"></i>&nbsp;&nbsp;'+menuL1_title[i]+'</a></li>\n';
+		}else
+			if (i==8){
+				if (L1 != 8 || www_L8x != 1){
+					menu1_code +='<ul><li><div id="subMenu1" class="accordion" style="width:212px;">';
+					for(var j = 1; j <= 10; ++j){
+					if(menuL2_title[j] == "")
+						continue;
+					else if(L2 == j)
+						menu1_code += '<a href="javascript: void(0)" style="color: #005580; font-weight: bold"><i class="icon-minus"></i>&nbsp;&nbsp;'+menuL2_title[j]+'</a>\n';
+					else
+						menu1_code += '<a id="menuL2_link_'+j+'" href="'+menuL2_link[j]+'"><i class="icon-minus"></i>&nbsp;&nbsp;'+menuL2_title[j]+'</a>\n';
+					};
+					menu1_code += '</div></li></ul>';
+				};
+				if(L1 == i && L2 <= 0)
+					menu1_code += '<li class="active" id="option'+i+'"><a href="javascript:;"><i class="'+menuL1_icon[i]+'"></i>&nbsp;&nbsp;'+menuL1_title[i]+'</a></li>\n';
+				else
+					menu1_code += '<li id="option'+i+'"><a href="'+menuL1_link[i]+'" title="'+menuL1_link[i]+'"><i class="'+menuL1_icon[i]+'"></i>&nbsp;&nbsp;'+menuL1_title[i]+'</a></li>\n';
+				
+		}else{
+				menu1_code += '<li id="option'+i+'"><a href="'+menuL1_link[i]+'" title="'+menuL1_link[i]+'"><i class="'+menuL1_icon[i]+'"></i>&nbsp;&nbsp;'+menuL1_title[i]+'</a></li>\n';
+		
+		};
+			
 	}
-	$j("#mainMenu").html(navL1);
-	
-	//L3
+
+	$("mainMenu").innerHTML = menu1_code;
+
+	for(var i = 11; i <= menuL2_title.length-1; ++i){
+		if(menuL2_title[i] == "")
+			continue;
+		if(L1 != 8 && www_L9x == 1)
+			continue;
+		else if(L2 == i)
+			menu2_code += '<a href="javascript: void(0)" style="color: #005580; font-weight: bold"><i class="icon-minus"></i>&nbsp;&nbsp;'+menuL2_title[i]+'</a>\n';
+		else
+			menu2_code += '<a id="menuL2_link_'+i+'" href="'+menuL2_link[i]+'"><i class="icon-minus"></i>&nbsp;&nbsp;'+menuL2_title[i]+'</a>\n';
+	}
+	$("subMenu").innerHTML = menu2_code;
+
 	if(L3){
-		tab_code = '<ul class="nav nav-tabs" style="margin-bottom: 0px;">';
-		for(var i = 0; i < tabM[L2-1].length; ++i){
-			var title=typeof tabM[L2-1][i].title =="undefined"?"":tabM[L2-1][i].title;
-			var link=typeof tabM[L2-1][i].link =="undefined"?"":tabM[L2-1][i].link;
-			if(title == "")
+		tab_code = '<ul class="nav nav-tabs" style="margin-bottom: 0px;">\n';
+		for(var i = 1; i < tabtitle[L2-1].length; ++i){
+			if(tabtitle[L2-1][i] == "")
 				continue;
-			if(L3 ==( i+1)){
-				var tab_ref = (L2==9 && i>0 && link.indexOf("#")>0)?link:"javascript: void(0)";
-				tab_code += '<li class="active"><a href="' +tab_ref+ '">'+title+'</a></li>';
+			if(L3 == i){
+				tab_ref = "javascript: void(0)";
+				if (L2==9 && i>0 && tablink[L2-1][i].indexOf("#")>0)
+					tab_ref = tablink[L2-1][i];
+				tab_code += '<li class="active"><a href="' +tab_ref+ '">'+tabtitle[L2-1][i]+'</a></li>\n';
 			}else
-				tab_code += '<li><a href="' +link+ '">'+title+'</a></li>';
+				tab_code += '<li><a href="' +tablink[L2-1][i]+ '">'+tabtitle[L2-1][i]+'</a></li>\n';
 		}
-		tab_code += '</ul>';
-		$j("#tabMenu").html(tab_code);
+		tab_code += '</ul>\n';
+		$("tabMenu").innerHTML = tab_code;
 	}
 	else
-		$j("#tabMenu").html("");
+		$("tabMenu").innerHTML = "";
 }
 
 function show_footer(){
@@ -764,6 +756,37 @@ function submit_language(){
 	}
 }
 
+function button_script1(){
+	var str = '你确定要执行'+button_script_1_s+'按钮功能吗？';
+	if(confirm(str)){
+	var $j = jQuery.noConflict();
+	$j.post('/apply.cgi',
+	{
+		'action_mode': ' button_script1 ',
+	});
+	}
+}
+
+function button_script2(){
+	var str = '你确定要执行'+button_script_2_s+'按钮功能吗？';
+	if(confirm(str)){
+	var $j = jQuery.noConflict();
+	$j.post('/apply.cgi',
+	{
+		'action_mode': ' button_script2 ',
+	});
+	}
+}
+
+function button_shellinabox(){
+	var port = '<% nvram_get_x("", "shellinabox_port"); %>';
+        if (port == '')
+            var port = '4200';
+        var porturl =window.location.protocol + '//' + window.location.hostname + ":" + port;
+        //alert(porturl);
+        window.open(porturl,'shellinabox');
+}
+
 function logout(){
 	if(!confirm('<#JS_logout#>'))
 		return;
@@ -778,17 +801,6 @@ function reboot(){
 	$j.post('/apply.cgi',
 	{
 		'action_mode': ' Reboot ',
-	});
-}
-
-function shutdown(){
-	if(!confirm('<#JS_shutdown#>'))
-		return;
-	var $j = jQuery.noConflict();
-	$j.post('/apply.cgi',
-	{
-		'action_mode': ' Shutdown ',
-		'current_page': 'Main_LogStatus_Content.asp'
 	});
 }
 
@@ -850,6 +862,22 @@ function clearlog(){
 		'current_page': 'Main_LogStatus_Content.asp'
 	});
 	setLogData();
+}
+
+function shutdown(){
+	var str = "关机后需要手动断电接电才能启动路由!!!\n你确定要关机吗？";
+	if(confirm(str)){
+		var $j = jQuery.noConflict();
+		$j.post('/apply.cgi',
+		{
+			'action_mode': ' shutdown ',
+			'current_page': 'Main_LogStatus_Content.asp'
+		});
+		setLogData();
+	}
+	else{
+		setLogData();
+	}
 }
 
 function kb_to_gb(kilobytes){
@@ -1272,7 +1300,7 @@ function setLogData(){
     var $j = jQuery.noConflict();
     $j.get('/log_content.asp', function(data){
         // fix for ie
-        if($j.browser.msie && !is_ie11p)
+        if(is_msie && !is_ie11p)
             data = data.nl2br();
         if($j("#log_area").val() == ''){
             $j("#log_area").text(data);
@@ -1315,12 +1343,25 @@ function onCompleteSlideOutLogArea(){
         clearTimeout(idTimeout);
         jQuery(".log_text").html('Log');
     }, 1500);
+    var idTimeout2 = setTimeout(function(){
+        clearTimeout(idTimeout2);
+        document.querySelector("#log_area").disabled = 0;
+        document.querySelector("#log_area").readOnly = true;
+    }, 700);
+}
+
+function onCompleteslideInLogArea(){
+    var idTimeout1 = setTimeout(function(){
+        clearTimeout(idTimeout1);
+        document.querySelector("#log_area").readOnly = false;
+        document.querySelector("#log_area").disabled = 1;
+    }, 700);
 }
 
 function passwordShowHide(id){
     var obj = $j('#'+id);
     var changeTo = (obj.attr('type') == 'password') ? 'text' : 'password';
-    if ($j.browser.msie && parseInt($j.browser.version, 10) < 9){
+    if (is_msie && parseInt($j.browser.version, 10) < 9){
         var marker = $j('<span />').insertBefore('#'+id);
         obj.detach().attr('type', changeTo).insertAfter(marker);
         marker.remove();
@@ -1381,25 +1422,6 @@ function removeFromLocalStorage(name){
     if(isLocalStorageAvailable()){
         localStorage.removeItem(name);
     }
-}
-
-function mobilestyle(){
-	var sc = document.createElement("meta");sc.setAttribute("name", "viewport");sc.setAttribute("content", "width=device-width, initial-scale=1, user-scalable=yes");document.head.appendChild(sc);
-	$j = jQuery.noConflict();
-	setTimeout(function(){
-		if($j(window).width()<800){//body 加载晚
-			var qc="";
-			$j('.table-big tr').each(function(){
-				var o=$j(this);
-				qc+='<div class="sub" id="'+o.attr('id')+'" style="'+o.attr('style')+'">'+$j('td',o).html()+'</div>';
-			});
-			$j('<div class="quickmenu">'+qc+'</div>').insertBefore("#tabMenu");
-			$j('.table-big').remove();
-
-			$j('#net_chart,#cpu_chart').parents("table").parent().addClass('chart-parent');
-
-		}
-	},500);
 }
 
 (function($){
@@ -1507,13 +1529,13 @@ function mobilestyle(){
         var slideIn = function() {
 
             if (settings.tabLocation === 'top') {
-                obj.animate({top:'-' + properties.containerHeight}, settings.speed).removeClass('open');
+                obj.animate({top:'-' + properties.containerHeight}, settings.speed, onCompleteslideInLogArea()).removeClass('open');
             } else if (settings.tabLocation === 'left') {
-                obj.animate({left: '-' + properties.containerWidth}, settings.speed).removeClass('open');
+                obj.animate({left: '-' + properties.containerWidth}, settings.speed, onCompleteslideInLogArea()).removeClass('open');
             } else if (settings.tabLocation === 'right') {
-                obj.animate({right: '-' + properties.containerWidth}, settings.speed).removeClass('open');
+                obj.animate({right: '-' + properties.containerWidth}, settings.speed, onCompleteslideInLogArea()).removeClass('open');
             } else if (settings.tabLocation === 'bottom') {
-                obj.animate({bottom: '-' + properties.containerHeight}, settings.speed).removeClass('open');
+                obj.animate({bottom: '-' + properties.containerHeight}, settings.speed, onCompleteslideInLogArea()).removeClass('open');
             }
 
         };
@@ -1581,5 +1603,4 @@ function mobilestyle(){
             hoverAction();
         }
     };
-    mobilestyle();
 })(jQuery);
